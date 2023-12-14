@@ -32,14 +32,17 @@ class mqtt_sensor(Sensor, Reconfigurable):
     latest_reading: str
 
     # Client
-    mqtt_client: mqtt.Client
-    mqtt_client = mqtt.Client()
+    mqtt_client: mqtt.Client = mqtt.Client()
 
     # Client Parameters
     client_id: str = mqtt_client._client_id  
     clean_session: bool = mqtt_client._clean_session
     protocol: int = mqtt_client._protocol  # MQTTv31 = 3 MQTTv311 = 4 MQTTv5 = 5
     transport: str = mqtt_client._transport
+
+    # Client Authentication
+    client_username: str = ""
+    client_password: str = ""
 
     # Constructor
     @classmethod
@@ -72,6 +75,9 @@ class mqtt_sensor(Sensor, Reconfigurable):
         self.clean_session = bool(config.attributes.fields['clean_session'].bool_value)  if 'clean_session' in config.attributes.fields else self.clean_session
         self.protocol = config.attributes.fields['protocol'].string_value if 'protocol' in config.attributes.fields else self.protocol  # MQTTv31 = 3 MQTTv311 = 4 MQTTv5 = 5
         self.transport = config.attributes.fields['transport'].string_value if 'transport' in config.attributes.fields else self.transport  # tcp or websockets
+        self.client_username = config.attributes.fields['client_username'].string_value if 'client_username' in config.attributes.fields else self.client_username
+        self.client_password = config.attributes.fields['client_password'].string_value if 'client_password' in config.attributes.fields else self.client_password
+
 
         if 'mapping_dict' in config.attributes.fields:
             if (config.attributes.fields['mapping_dict'].struct_value):
@@ -82,6 +88,9 @@ class mqtt_sensor(Sensor, Reconfigurable):
             self.mapping_dict = None
 
         self.mqtt_client.reinitialise(self.client_id, self.clean_session)
+
+        if self.client_username != "" or self.client_password != "":
+            self.mqtt_client.username_pw_set(self.client_username, self.client_password)
 
         # Set up callbacks
         self.mqtt_client.on_connect = self.on_connect
@@ -178,7 +187,9 @@ async def main():
     config.attributes.fields['mqtt_topic'].string_value = "my_test_topic"
     config.attributes.fields['transport'].string_value = "tcp"
     config.attributes.fields['mqtt_qos'].number_value = 2
-    # config.attributes.fields['mapping_dict'].string_value = '{"time": "timestamp", "value": "payload"}'
+    config.attributes.fields['mapping_dict'].string_value = '{"time": "timestamp", "value": "payload"}'
+    config.attributes.fields['client_username'].string_value = "username"
+    config.attributes.fields['client_password'].string_value = "password"
 
     my_mqtt_sensor = mqtt_sensor(name="mqtt-sensor")
     my_mqtt_sensor.validate(config)
