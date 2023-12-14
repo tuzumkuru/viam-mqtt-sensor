@@ -126,9 +126,8 @@ class mqtt_sensor(Sensor, Reconfigurable):
 
         if self.mapping_dict is not None:
             temp_return_message = self.map_json(return_message, self.mapping_dict)
-        
-        if(temp_return_message != None):
-            return_message = temp_return_message
+            if(temp_return_message != None):
+                return_message = temp_return_message
 
         return return_message
 
