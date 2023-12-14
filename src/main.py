@@ -3,7 +3,7 @@ import sys
 
 from viam.module.module import Module
 from viam.components.sensor import Sensor
-from .mqtt import mqtt_sensor
+from .mqtt_sensor import mqtt_sensor
 
 async def main():
     """This function creates and starts a new module, after adding all desired resources.
