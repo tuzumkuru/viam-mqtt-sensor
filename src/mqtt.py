@@ -59,7 +59,6 @@ class mqtt_sensor(Sensor, Reconfigurable):
         self.broker_address = config.attributes.fields['broker_address'].string_value
         self.broker_port = int(config.attributes.fields['broker_port'].number_value)
         self.mqtt_topic = config.attributes.fields['mqtt_topic'].string_value
-
         
         # Set up callbacks
         self.mqtt_client.on_connect = self.on_connect
