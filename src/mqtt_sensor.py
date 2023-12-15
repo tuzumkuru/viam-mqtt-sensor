@@ -111,27 +111,27 @@ class mqtt_sensor(Sensor, Reconfigurable):
     def on_message(self, client, userdata, msg):
         # Update the latest reading when a new message is received
         LOGGER.info(f"MQTT Message Received from topic:{msg.topic}")
-        self.latest_reading = {
+        self.latest_reading = json.dumps({
             'timestamp': time.time(),
             'topic': msg.topic,
-            'payload': msg.payload.decode('utf-8'),
+            'payload': json.loads(msg.payload.decode('utf-8')),
             'qos': msg.qos,
             'retain': msg.retain,
             'message_id': msg.mid,
-        }
+        })
 
     async def get_readings(self, *, extra: Optional[Mapping[str, Any]] = None, timeout: Optional[float] = None, **kwargs) -> Mapping[str, Any]:
         return_message = self.latest_reading
 
         if return_message is None:
-            return_message = {
+            return_message = json.dumps({
                 'timestamp': 0,
                 'topic': "",
                 'payload': "",
                 'qos': 0,
                 'retain': 0,
                 'message_id': 0,
-            }
+            })
 
         if self.mapping_dict is not None:
             temp_return_message = self.map_json(return_message, self.mapping_dict)
@@ -142,19 +142,10 @@ class mqtt_sensor(Sensor, Reconfigurable):
 
     @classmethod
     def map_json(cls, json_message, mapping_dict):
-        if json_message is None:
-            return None  # or handle it according to your requirements
-
-        # Convert string representation of JSON to a dictionary
-        if isinstance(mapping_dict, str):
-            try:
-                mapping_dict = json.loads(mapping_dict)
-            except json.JSONDecodeError as e:
-                LOGGER.error(f"Error decoding JSON: {e}")
-                return None  # or handle the decoding error as needed
+        null_value = ''
 
         result = {}
-        
+
         for key, value in mapping_dict.items():
             keys = value.split('.')
             current_data = json_message
@@ -167,39 +158,52 @@ class mqtt_sensor(Sensor, Reconfigurable):
                         current_data = json.loads(current_data)
                         current_data = current_data.get(k)
                     except json.JSONDecodeError as e:
-                        LOGGER.error(f"Error decoding JSON: {e}")
-                        current_data = None
+                        LOGGER.error(f"Error in mapping.  {e}")
+                        current_data = null_value
                 else:
-                    current_data = None
+                    current_data = null_value 
 
-                if current_data is None:
-                    break  # Break out of the inner loop if the data is None
+                if not current_data:
+                    current_data = null_value
+                    break
 
-            result[key] = current_data  # Preserve the original type
+            result[key] = current_data  
 
         return result
 
 
+
 async def main():
+    # Create config for testing sensor outside Viam app
+    from google.protobuf.struct_pb2 import Struct       # needed for ComponentConfig declaration
+    from google.protobuf.json_format import ParseDict   # needed for ComponentConfig declaration
+
     config = ComponentConfig()
-    config.attributes.fields['broker_address'].string_value = "test.mosquitto.org"
-    config.attributes.fields['broker_port'].number_value = 1883
-    config.attributes.fields['mqtt_topic'].string_value = "my_test_topic"
-    config.attributes.fields['transport'].string_value = "tcp"
-    config.attributes.fields['mqtt_qos'].number_value = 2
-    config.attributes.fields['mapping_dict'].string_value = '{"time": "timestamp", "value": "payload"}'
-    config.attributes.fields['client_username'].string_value = "username"
-    config.attributes.fields['client_password'].string_value = "password"
+    sensor_config =  {
+            "broker_address": "test.mosquitto.org",
+            "broker_port": 1883,
+            "mqtt_topic": "my_test_topic",
+            "mapping_dict": {
+                "time": "timestamp",
+                "temperature": "payload.temperature",
+                "humidity": "payload.humidity"
+            },
+            #"client_username": "<<username>>",
+            #"client_password": "<<password>>",
+        }
+
+    struct_instance = Struct()
+    ParseDict(sensor_config, struct_instance)
+    config.attributes.CopyFrom(struct_instance)
 
     my_mqtt_sensor = mqtt_sensor(name="mqtt-sensor")
     my_mqtt_sensor.validate(config)
     my_mqtt_sensor.reconfigure(config, None)
 
-    # Use asyncio.sleep instead of time.sleep
-    await asyncio.sleep(3)
-
-    signal = await my_mqtt_sensor.get_readings()
-    print(signal)
+    while(True):
+        await asyncio.sleep(1)
+        signal = await my_mqtt_sensor.get_readings()
+        print(signal)
 
 
 if __name__ == '__main__':
