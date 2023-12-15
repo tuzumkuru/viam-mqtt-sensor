@@ -92,6 +92,7 @@ Pull requests, issues and all other contributions are welcome.
 ## Future Work
 
 The following work need to be implemented for better user experience: 
+* JSON Configuration validation in code
 * More compatibility to other authentication modules.
 * More generic value mapping that enables data formatting.
 
