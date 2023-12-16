@@ -53,11 +53,73 @@ class mqtt_sensor(Sensor, Reconfigurable):
 
     # Validates JSON Configuration
     @classmethod
-    def validate(cls, config: ComponentConfig):
-        # here we validate config, the following is just an example and should be updated as needed
-        some_pin = config.attributes.fields["some_pin"].number_value
-        if some_pin == "":
-            raise Exception("A some_pin must be defined")
+    def validate(cls, config):
+        # Validate required parameters
+        required_params = ['broker_address', 'broker_port', 'mqtt_topic']
+
+        for param in required_params:
+            if not param in config.attributes.fields:
+                raise Exception(f"{param} must be defined.")
+            
+        # Validate broker_address and mqtt_topic as strings        
+        topic = config.attributes.fields["broker_address"].string_value
+        if topic is None or len(topic) == 0:
+                    raise ValueError('Invalid broker_address.')
+        
+        topic = config.attributes.fields["mqtt_topic"].string_value
+        if topic is None or len(topic) == 0:
+                    raise ValueError('Invalid mqtt_topic.')
+
+        # Validate broker_port as a valid integer
+        if 'broker_port' in config.attributes.fields:
+            port_value = config.attributes.fields['broker_port'].number_value
+            if not isinstance(port_value, (int,float)) or port_value <= 0 or port_value > 65535:
+                raise Exception("Invalid broker port number.")
+
+        # Validate optional parameters with specific conditions
+        if 'mqtt_qos' in config.attributes.fields:
+            qos_value = config.attributes.fields['mqtt_qos'].number_value
+
+            if not isinstance(qos_value, (int, float)) or qos_value not in [0.0, 1.0, 2.0]:
+                raise Exception("MQTT QoS must be a valid number and set to 0, 1, or 2")
+
+        if 'protocol' in config.attributes.fields:
+            protocol_value = config.attributes.fields['protocol'].number_value
+            valid_protocol_values = [3, 4, 5]
+            if not protocol_value or protocol_value not in valid_protocol_values:
+                raise Exception("Invalid MQTT protocol version.")
+
+        if 'transport' in config.attributes.fields and config.attributes.fields['transport'].string_value not in ['tcp', 'websockets']:
+            raise Exception("Invalid transport protocol.")
+
+        if 'clean_session' in config.attributes.fields and not isinstance(config.attributes.fields['clean_session'].bool_value, bool):
+            raise Exception("Clean session must be a boolean value.")
+
+        # Validate client_id and clean_session relationship
+        if 'clean_session' in config.attributes.fields and not config.attributes.fields['clean_session'].bool_value:
+            if not config.attributes.fields['client_id'].string_value:
+                raise Exception("client_id must be defined when clean_session is set to false.")
+
+        # # Validate client_username and client_password relationship
+        # # Commented out since MQTT protocol does not restrict this. Code is left for reference
+        # if 'client_username' in config.attributes.fields or 'client_password' in config.attributes.fields:
+        #     if 'client_username' not in config.attributes.fields or 'client_password' not in config.attributes.fields:
+        #         raise Exception("Both client_username and client_password must be defined if either is set.")
+
+        # Validate mapping_dict
+        if 'mapping_dict' in config.attributes.fields:
+            mapping_dict = config.attributes.fields['mapping_dict'].struct_value
+
+            # Check if there is more than 0 key-value pairs
+            if len(mapping_dict) == 0:
+                raise Exception("Mapping dictionary must contain key-value pairs.")
+            
+            # Iterate over key-value pairs and check if kv_pair is a string
+            for kv_pair in mapping_dict:
+                if not isinstance(kv_pair, str) or not isinstance(mapping_dict[kv_pair], str):
+                    raise Exception("Each element in the mapping dictionary must be a key-value pair string.")
+
+        # If all validations pass, return
         return
 
     # Handles attribute reconfiguration
@@ -68,7 +130,7 @@ class mqtt_sensor(Sensor, Reconfigurable):
         self.broker_address = config.attributes.fields['broker_address'].string_value
         self.broker_port = int(config.attributes.fields['broker_port'].number_value)
         self.mqtt_topic = config.attributes.fields['mqtt_topic'].string_value
-        
+
         # Set optional parameters if set in config
         self.mqtt_qos = int(config.attributes.fields['mqtt_qos'].number_value)
         self.client_id = config.attributes.fields['client_id'].string_value if 'client_id' in config.attributes.fields else self.client_id
@@ -179,17 +241,22 @@ async def main():
     from google.protobuf.json_format import ParseDict   # needed for ComponentConfig declaration
 
     config = ComponentConfig()
-    sensor_config =  {
+    sensor_config = {
             "broker_address": "test.mosquitto.org",
             "broker_port": 1883,
-            "mqtt_topic": "my_test_topic",
+            "mqtt_topic": "my_topic",
+            "mqtt_qos": 0,
+            "protocol" : 5,
+            "transport" : "tcp",
+            "client_id" : "<<client_id>>",
+            "clean_session" : True,
+            "client_username": "<<username>>",
+            "client_password": "<<password>>",
             "mapping_dict": {
                 "time": "timestamp",
                 "temperature": "payload.temperature",
                 "humidity": "payload.humidity"
-            },
-            #"client_username": "<<username>>",
-            #"client_password": "<<password>>",
+            }
         }
 
     struct_instance = Struct()
