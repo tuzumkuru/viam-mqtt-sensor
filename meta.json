@@ -2,7 +2,7 @@
   "module_id": "tuzumkuru:mqtt-sensor",
   "visibility": "public",
   "url": "https://github.com/tuzumkuru/viam-mqtt-sensor",
-  "description": "An MQTT client that subscribes to a host and listens for a topic and returns the published data. Authentication and value mapping is also supported. ",
+  "description": "An MQTT client that subscribes to a topic at a broker and returns the published data. Authentication and value mapping is also supported. ",
   "models": [
     {
       "api": "rdk:component:sensor",
