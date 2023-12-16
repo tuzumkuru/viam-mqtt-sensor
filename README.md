@@ -16,7 +16,9 @@ This module uses [rdk:component:sensor API](https://python.viam.dev/autoapi/viam
 
 ## Usage
 
-Install the module via the Viam Modular Registry.
+After creating your robot at [Viam App](https://app.viam.com), at your robots page, open Config -> Components -> Create Compoenent and search for "mqtt" and choose "sensor / mqtt" by tuzumkuru. 
+Choose Add module and then Create after giving you component a custom name. 
+Add proper configuration in attributes section of your newly added component. Configuration is explained below. 
 
 ## Viam Module Configuration
 Below are all configuration parameters:
