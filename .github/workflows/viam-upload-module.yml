@@ -1,5 +1,5 @@
 on:
-  push:
+  # push: # no need to run on push, disabling for now
   release:
     types: [published]
 
