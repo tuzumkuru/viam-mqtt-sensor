@@ -173,10 +173,16 @@ class mqtt_sensor(Sensor, Reconfigurable):
     def on_message(self, client, userdata, msg):
         # Update the latest reading when a new message is received
         LOGGER.info(f"MQTT Message Received from topic:{msg.topic}")
+        try:
+            payload = json.loads(msg.payload.decode('utf-8'))
+        except json.JSONDecodeError as e:
+            LOGGER.warn(f"Error decoding message payload: {e}")
+            payload = {}
+
         self.latest_reading = json.dumps({
             'timestamp': time.time(),
             'topic': msg.topic,
-            'payload': json.loads(msg.payload.decode('utf-8')),
+            'payload': payload,
             'qos': msg.qos,
             'retain': msg.retain,
             'message_id': msg.mid,
@@ -244,14 +250,14 @@ async def main():
     sensor_config = {
             "broker_address": "test.mosquitto.org",
             "broker_port": 1883,
-            "mqtt_topic": "my_topic",
-            "mqtt_qos": 0,
-            "protocol" : 5,
-            "transport" : "tcp",
-            "client_id" : "<<client_id>>",
-            "clean_session" : True,
-            "client_username": "<<username>>",
-            "client_password": "<<password>>",
+            "mqtt_topic": "my_test_topic",
+            #"mqtt_qos": 0,
+            #"protocol" : 5,
+            #"transport" : "tcp",
+            #"client_id" : "<<client_id>>",
+            #"clean_session" : True,
+            #"client_username": "<<username>>",
+            #"client_password": "<<password>>",
             "mapping_dict": {
                 "time": "timestamp",
                 "temperature": "payload.temperature",
@@ -270,7 +276,7 @@ async def main():
     while(True):
         await asyncio.sleep(1)
         signal = await my_mqtt_sensor.get_readings()
-        print(signal)
+        LOGGER.info(signal)
 
 
 if __name__ == '__main__':
