@@ -202,10 +202,10 @@ class mqtt_sensor(Sensor, Reconfigurable):
             if(temp_return_message != None):
                 return_message = temp_return_message
 
-        return return_message
+        return json.loads(return_message)
 
     @classmethod
-    def map_json(cls, json_message, mapping_dict):
+    def map_json(cls, json_message, mapping_dict) -> str:
         null_value = ''
 
         result = {}
@@ -233,7 +233,7 @@ class mqtt_sensor(Sensor, Reconfigurable):
 
             result[key] = current_data  
 
-        return result
+        return json.dumps(result)
 
 
 async def main():
