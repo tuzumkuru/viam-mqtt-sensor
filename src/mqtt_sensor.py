@@ -22,27 +22,11 @@ LOGGER = getLogger(__name__)
 
 class mqtt_sensor(Sensor, Reconfigurable):
     MODEL: ClassVar[Model] = Model(ModelFamily("tuzumkuru", "sensor"), "mqtt")
-    
-    # Broker parameters
-    broker_address: str
-    broker_port: int
-    mqtt_topic: str
-    mqtt_qos: int = 0
 
-    latest_reading: str
-
-    # Client
-    mqtt_client: mqtt.Client = mqtt.Client()
-
-    # Client Parameters
-    client_id: str = mqtt_client._client_id  
-    clean_session: bool = mqtt_client._clean_session
-    protocol: int = mqtt_client._protocol  # MQTTv31 = 3 MQTTv311 = 4 MQTTv5 = 5
-    transport: str = mqtt_client._transport
-
-    # Client Authentication
-    client_username: str = ""
-    client_password: str = ""
+    def __init__(self, name: str):
+        super().__init__(name)
+        self.mqtt_client: mqtt.Client = None
+        self.latest_reading: str = None
 
     # Constructor
     @classmethod
@@ -122,24 +106,19 @@ class mqtt_sensor(Sensor, Reconfigurable):
         # If all validations pass, return
         return
 
+
     # Handles attribute reconfiguration
     def reconfigure(self, config: ComponentConfig, dependencies: Mapping[ResourceName, ResourceBase]):
+        if self.mqtt_client is not None:
+            self.mqtt_client.disconnect()
+            self.mqtt_client.loop_stop()
+        
         self.latest_reading = None
 
-        # Get parameters from config
         self.broker_address = config.attributes.fields['broker_address'].string_value
         self.broker_port = int(config.attributes.fields['broker_port'].number_value)
         self.mqtt_topic = config.attributes.fields['mqtt_topic'].string_value
-
-        # Set optional parameters if set in config
         self.mqtt_qos = int(config.attributes.fields['mqtt_qos'].number_value)
-        self.client_id = config.attributes.fields['client_id'].string_value if 'client_id' in config.attributes.fields else self.client_id
-        self.clean_session = bool(config.attributes.fields['clean_session'].bool_value)  if 'clean_session' in config.attributes.fields else self.clean_session
-        self.protocol = config.attributes.fields['protocol'].string_value if 'protocol' in config.attributes.fields else self.protocol  # MQTTv31 = 3 MQTTv311 = 4 MQTTv5 = 5
-        self.transport = config.attributes.fields['transport'].string_value if 'transport' in config.attributes.fields else self.transport  # tcp or websockets
-        self.client_username = config.attributes.fields['client_username'].string_value if 'client_username' in config.attributes.fields else self.client_username
-        self.client_password = config.attributes.fields['client_password'].string_value if 'client_password' in config.attributes.fields else self.client_password
-
 
         if 'mapping_dict' in config.attributes.fields:
             if (config.attributes.fields['mapping_dict'].struct_value):
@@ -149,10 +128,27 @@ class mqtt_sensor(Sensor, Reconfigurable):
         else:
             self.mapping_dict = None
 
-        self.mqtt_client.reinitialise(self.client_id, self.clean_session)
+        client_params = {}
 
-        if self.client_username != "" or self.client_password != "":
-            self.mqtt_client.username_pw_set(self.client_username, self.client_password)
+        if 'client_id' in config.attributes.fields:
+            client_params["client_id"] = config.attributes.fields['client_id'].string_value
+
+        if 'clean_session' in config.attributes.fields:
+            client_params["clean_session"] = bool(config.attributes.fields['clean_session'].bool_value)
+
+        if 'protocol' in config.attributes.fields:
+            client_params["protocol"] = config.attributes.fields['protocol'].string_value
+
+        if 'transport' in config.attributes.fields:
+            client_params["transport"] = config.attributes.fields['transport'].string_value
+
+        self.mqtt_client = mqtt.Client(**client_params)
+
+        if 'client_username' in config.attributes.fields or 'client_password' in config.attributes.fields:
+            if 'client_password' in config.attributes.fields:
+                self.mqtt_client.username_pw_set(username=config.attributes.fields['client_username'].string_value, password=config.attributes.fields['client_password'].string_value)
+            else:
+                self.mqtt_client.username_pw_set(username=config.attributes.fields['client_username'].string_value)
 
         # Set up callbacks
         self.mqtt_client.on_connect = self.on_connect
@@ -240,7 +236,6 @@ class mqtt_sensor(Sensor, Reconfigurable):
         return result
 
 
-
 async def main():
     # Create config for testing sensor outside Viam app
     from google.protobuf.struct_pb2 import Struct       # needed for ComponentConfig declaration
@@ -269,9 +264,9 @@ async def main():
     ParseDict(sensor_config, struct_instance)
     config.attributes.CopyFrom(struct_instance)
 
-    my_mqtt_sensor = mqtt_sensor(name="mqtt-sensor")
-    my_mqtt_sensor.validate(config)
-    my_mqtt_sensor.reconfigure(config, None)
+    mqtt_sensor.validate(config)
+    
+    my_mqtt_sensor = mqtt_sensor.new(config,None)    
 
     while(True):
         await asyncio.sleep(1)
